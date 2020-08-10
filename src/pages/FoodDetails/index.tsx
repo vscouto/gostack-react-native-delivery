@@ -60,6 +60,10 @@ interface Food {
   extras: Extra[];
 }
 
+interface Favorite {
+  id: number;
+}
+
 const FoodDetails: React.FC = () => {
   const [food, setFood] = useState({} as Food);
   const [extras, setExtras] = useState<Extra[]>([]);
@@ -74,33 +78,112 @@ const FoodDetails: React.FC = () => {
   useEffect(() => {
     async function loadFood(): Promise<void> {
       // Load a specific food with extras based on routeParams id
+      // Load Foods from API
+      const foodResponse = await api.get<Food>(`/foods/${routeParams.id}`);
+      const favoritesResponse = await api.get<Favorite[]>('/favorites');
+
+      const formatedFood = {
+        ...foodResponse.data,
+        formattedPrice: formatValue(foodResponse.data.price),
+      };
+
+      const formatedExtras = formatedFood.extras.map(extra => {
+        return {
+          ...extra,
+          quantity: 0,
+        };
+      });
+
+      setFood(formatedFood);
+      setExtras(formatedExtras);
+
+      const favorites = favoritesResponse.data;
+
+      if (favorites) {
+        const findFavorite = favorites.find(
+          favorite => favorite.id === routeParams.id,
+        );
+
+        setIsFavorite(!!findFavorite);
+      }
     }
 
     loadFood();
   }, [routeParams]);
 
-  function handleIncrementExtra(id: number): void {
-    // Increment extra quantity
-  }
+  const handleIncrementExtra = useCallback(
+    (id: number) => {
+      const updateExtras = extras.map(extra => {
+        if (extra.id === id) {
+          const quantity = extra.quantity ? extra.quantity : 0;
 
-  function handleDecrementExtra(id: number): void {
-    // Decrement extra quantity
-  }
+          const newExtra = {
+            id: extra.id,
+            name: extra.name,
+            value: extra.value,
+            quantity: quantity + 1,
+          };
+          return newExtra;
+        }
+        return extra;
+      });
 
-  function handleIncrementFood(): void {
+      setExtras(updateExtras);
+    },
+    [extras],
+  );
+
+  const handleDecrementExtra = useCallback(
+    (id: number) => {
+      const updateExtras = extras.map(extra => {
+        if (extra.id === id && extra.quantity > 0) {
+          const quantity = extra.quantity ? extra.quantity : 0;
+
+          const newExtra = {
+            id: extra.id,
+            name: extra.name,
+            value: extra.value,
+            quantity: quantity - 1,
+          };
+          return newExtra;
+        }
+        return extra;
+      });
+
+      setExtras(updateExtras);
+    },
+    [extras],
+  );
+
+  const handleIncrementFood = useCallback(() => {
     // Increment food quantity
-  }
+    setFoodQuantity(foodQuantity + 1);
+  }, [foodQuantity]);
 
-  function handleDecrementFood(): void {
-    // Decrement food quantity
-  }
+  const handleDecrementFood = useCallback(() => {
+    // Increment food quantity
+    if (foodQuantity > 1) {
+      setFoodQuantity(foodQuantity - 1);
+    }
+  }, [foodQuantity]);
 
   const toggleFavorite = useCallback(() => {
     // Toggle if food is favorite or not
+    setIsFavorite(!isFavorite);
   }, [isFavorite, food]);
 
   const cartTotal = useMemo(() => {
     // Calculate cartTotal
+
+    const totalExtras = extras.reduce((totalAnterior, extra) => {
+      return (
+        totalAnterior + (extra.quantity ? extra.quantity * extra.value : 0)
+      );
+    }, 0);
+
+    const total = foodQuantity * food.price + totalExtras;
+
+    return formatValue(total);
   }, [extras, food, foodQuantity]);
 
   async function handleFinishOrder(): Promise<void> {
